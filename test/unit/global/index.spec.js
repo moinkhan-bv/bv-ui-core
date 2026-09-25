@@ -24,13 +24,37 @@ describe('lib/global', function () {
     }
   });
 
-  it('should not wrap window in a Proxy when globalObj is window even if __esModule is set', function () {
+  it('should wrap window in a Proxy when __esModule is set, even when globalObj is window', function () {
     if (typeof window !== 'undefined') {
       window.__esModule = true;
       var result = require('../../../lib/global');
-      // When globalObj === window, the proxy branch should be skipped,
-      // so the result should be strictly equal to window.
-      expect(result).to.equal(window);
+      // The Proxy is needed so that native/branded methods (e.g.
+      // getComputedStyle) can be bound back to the real window before
+      // being returned, and so that `.default` interop lookups keep working.
+      expect(result).to.not.equal(window);
+      expect(result).to.eql(window);
+      delete window.__esModule;
+    }
+  });
+
+  it('should bind functions read off the Proxy to the real window so native methods work', function () {
+    if (typeof window !== 'undefined') {
+      window.__esModule = true;
+      var result = require('../../../lib/global');
+      // Calling a native/branded method via the Proxy receiver would
+      // otherwise throw "TypeError: Illegal invocation".
+      expect(function () {
+        result.getComputedStyle(document.body);
+      }).to.not.throw();
+      delete window.__esModule;
+    }
+  });
+
+  it('should return the real target for the "default" property (esModule interop)', function () {
+    if (typeof window !== 'undefined') {
+      window.__esModule = true;
+      var result = require('../../../lib/global');
+      expect(result.default).to.equal(window);
       delete window.__esModule;
     }
   });
